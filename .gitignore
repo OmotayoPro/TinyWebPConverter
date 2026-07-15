@@ -1,0 +1,18 @@
+.DS_Store
+.claude/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+
+# Xcode (for when the app target is added — the .xcodeproj itself is checked in)
+xcuserdata/
+DerivedData/
+*.xcscmblueprint
+*.xccheckout
+
+# Xcode Archives / build products
+*.ipa
+*.dSYM.zip
+*.dSYM
