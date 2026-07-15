@@ -12,6 +12,25 @@ final class BatchConverterTests: XCTestCase {
         try? FileManager.default.removeItem(at: tempDir)
     }
 
+    func testDefaultOutputDirectoryMatchesEachSourceFolder() async throws {
+        let subDirA = tempDir.appendingPathComponent("a", isDirectory: true)
+        let subDirB = tempDir.appendingPathComponent("b", isDirectory: true)
+        try FileManager.default.createDirectory(at: subDirA, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: subDirB, withIntermediateDirectories: true)
+
+        let sourceA = try TestImageFactory.makePNG(at: subDirA.appendingPathComponent("photo.png"))
+        let sourceB = try TestImageFactory.makePNG(at: subDirB.appendingPathComponent("photo.png"))
+
+        let items = try await BatchConverter.convert(sourceURLs: [sourceA, sourceB], settings: ConversionSettings())
+
+        for item in items {
+            guard case .done(let result) = item.status else {
+                return XCTFail("Expected .done for \(item.sourceURL), got \(item.status)")
+            }
+            XCTAssertEqual(result.outputURL.deletingLastPathComponent(), item.sourceURL.deletingLastPathComponent())
+        }
+    }
+
     func testEmptyBatchReturnsEmpty() async throws {
         let items = try await BatchConverter.convert(sourceURLs: [], settings: ConversionSettings(), outputDirectory: tempDir)
         XCTAssertTrue(items.isEmpty)
