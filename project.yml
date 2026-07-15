@@ -1,0 +1,38 @@
+name: TinyWebPConverter
+
+options:
+  bundleIdPrefix: com.omotayotaiwo
+  deploymentTarget:
+    macOS: "14.0"
+
+packages:
+  TinyWebPCore:
+    path: .
+
+targets:
+  TinyWebPConverter:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: App
+    settings:
+      base:
+        PRODUCT_NAME: TinyWebPConverter
+        PRODUCT_BUNDLE_IDENTIFIER: com.omotayotaiwo.TinyWebPConverter
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.10"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Tiny WebP Converter"
+        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Omotayo"
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+      configs:
+        Release:
+          ARCHS: "$(ARCHS_STANDARD)"
+          ONLY_ACTIVE_ARCH: NO
+    dependencies:
+      - package: TinyWebPCore
+        product: TinyWebPCore
