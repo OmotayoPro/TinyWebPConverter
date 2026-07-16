@@ -37,10 +37,14 @@ public enum BatchConverter {
     public static let maxBatchSize = 50
     public static let defaultConcurrencyLimit = 4
 
+    /// - Parameter outputDirectory: Where converted files go. `nil` (the default) matches
+    ///   PRD §6.2's default of "same folder as source" — each item writes next to its own
+    ///   source file. Pass a concrete URL to route the whole batch to one folder instead
+    ///   (e.g. a user-picked output location).
     public static func convert(
         sourceURLs: [URL],
         settings: ConversionSettings,
-        outputDirectory: URL,
+        outputDirectory: URL? = nil,
         concurrencyLimit: Int = defaultConcurrencyLimit,
         fileManager: FileManager = .default,
         onStatusChange: (@Sendable (_ itemID: UUID, _ status: BatchItemStatus) -> Void)? = nil
@@ -67,11 +71,12 @@ public enum BatchConverter {
                 onStatusChange?(items[index].id, .converting)
 
                 group.addTask {
+                    let destination = outputDirectory ?? url.deletingLastPathComponent()
                     do {
                         let result = try ConversionPipeline.convert(
                             fileAt: url,
                             settings: settings,
-                            outputDirectory: outputDirectory,
+                            outputDirectory: destination,
                             fileManager: fileManager
                         )
                         return (index, .done(result))
