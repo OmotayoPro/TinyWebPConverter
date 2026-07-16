@@ -89,6 +89,20 @@ final class ConversionPipelineTests: XCTestCase {
         }
     }
 
+    /// PRD §7: "a malformed or corrupted image file must produce a clean error, never a crash."
+    /// A valid PNG signature followed by garbage isn't a real-world scenario (more like a
+    /// truncated download or a bit-flipped file), but exercises the same ImageIO failure path.
+    func testCorruptedImageProducesCleanErrorNotCrash() throws {
+        let url = tempDir.appendingPathComponent("corrupted.png")
+        var bytes: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10] // PNG signature
+        bytes.append(contentsOf: (0..<256).map { _ in UInt8.random(in: 0...255) })
+        try Data(bytes).write(to: url)
+
+        XCTAssertThrowsError(try ConversionPipeline.convert(fileAt: url, settings: ConversionSettings(), outputDirectory: tempDir)) { error in
+            XCTAssertTrue(error is ConversionError, "Expected a typed ConversionError, got \(error)")
+        }
+    }
+
     func testKeepMetadataCarriesExifAndGPSIntoOutput() throws {
         let source = try TestImageFactory.makeJPEGWithMetadata(at: tempDir.appendingPathComponent("input.jpg"))
         let settings = ConversionSettings(keepMetadata: true)

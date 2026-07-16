@@ -92,6 +92,36 @@ enum TestImageFactory {
         return url
     }
 
+    /// A JPEG at real photo dimensions (default: 12MP, a typical phone photo). Filled with
+    /// noise via `arc4random_buf` rather than a per-pixel loop so generation itself stays fast
+    /// at this pixel count — this is deliberately high-entropy, worst-case-ish content for a
+    /// timing test (real photos compress better than noise), so a pass here is a conservative
+    /// bound on real-world speed, not an optimistic one.
+    @discardableResult
+    static func makeRealisticPhotoJPEG(width: Int = 4032, height: Int = 3024, at url: URL) throws -> URL {
+        let bytesPerRow = width * 4
+        var buffer = [UInt8](repeating: 0, count: bytesPerRow * height)
+        buffer.withUnsafeMutableBytes { raw in
+            arc4random_buf(raw.baseAddress, raw.count)
+        }
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = buffer.withUnsafeMutableBytes({ rawBuffer -> CGContext? in
+            CGContext(
+                data: rawBuffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: bytesPerRow, space: colorSpace, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            )
+        }), let cgImage = context.makeImage() else { throw FactoryError.setupFailed }
+
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
+            throw FactoryError.setupFailed
+        }
+        let options = [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary
+        CGImageDestinationAddImage(destination, cgImage, options)
+        guard CGImageDestinationFinalize(destination) else { throw FactoryError.setupFailed }
+        return url
+    }
+
     static func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
