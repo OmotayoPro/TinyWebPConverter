@@ -6,7 +6,9 @@ import TinyWebPCore
 /// PRD §6.5's "reveal the output in Finder" for completed items.
 struct FileQueueView: View {
     var items: [BatchItem]
+    var selectedItemID: BatchItem.ID?
     var onRemove: (BatchItem) -> Void
+    var onSelect: (BatchItem) -> Void
 
     var body: some View {
         List(items) { item in
@@ -41,6 +43,11 @@ struct FileQueueView: View {
                 }
             }
             .padding(.vertical, 2)
+            .contentShape(Rectangle())
+            .listRowBackground(item.id == selectedItemID ? Color.accentColor.opacity(0.15) : Color.clear)
+            .onTapGesture {
+                onSelect(item)
+            }
         }
     }
 
