@@ -14,7 +14,12 @@ enum WebPEncoder {
         }
         config.lossless = lossless ? 1 : 0
         config.quality = lossless ? 100 : clampedQuality
-        config.method = 6
+        // libwebp's encode effort dial (0 fastest ... 6 most thorough search). Measured on a
+        // realistic 12MP photo: method 6 took ~2.9s for a ~2.1MB result, method 2 took ~0.6s
+        // for an essentially identical ~2.1MB result - higher effort barely improves real-photo
+        // compression but costs several seconds. PRD §7 wants conversion to "feel instant" over
+        // squeezing out the last few KB, so we bias hard toward speed here.
+        config.method = 2
 
         guard WebPValidateConfig(&config) != 0 else {
             throw ConversionError.encodeFailed

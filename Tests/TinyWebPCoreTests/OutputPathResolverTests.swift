@@ -13,14 +13,14 @@ final class OutputPathResolverTests: XCTestCase {
     }
 
     func testReturnsPlainNameWhenNothingExists() {
-        let url = OutputPathResolver.resolve(baseName: "photo", directory: tempDir)
+        let url = OutputPathResolver.resolve(baseName: "photo", extension: "webp", directory: tempDir)
         XCTAssertEqual(url.lastPathComponent, "photo.webp")
     }
 
     func testAutoRenamesOnCollision() throws {
         FileManager.default.createFile(atPath: tempDir.appendingPathComponent("photo.webp").path, contents: Data())
 
-        let url = OutputPathResolver.resolve(baseName: "photo", directory: tempDir)
+        let url = OutputPathResolver.resolve(baseName: "photo", extension: "webp", directory: tempDir)
         XCTAssertEqual(url.lastPathComponent, "photo (1).webp")
     }
 
@@ -28,7 +28,12 @@ final class OutputPathResolverTests: XCTestCase {
         FileManager.default.createFile(atPath: tempDir.appendingPathComponent("photo.webp").path, contents: Data())
         FileManager.default.createFile(atPath: tempDir.appendingPathComponent("photo (1).webp").path, contents: Data())
 
-        let url = OutputPathResolver.resolve(baseName: "photo", directory: tempDir)
+        let url = OutputPathResolver.resolve(baseName: "photo", extension: "webp", directory: tempDir)
         XCTAssertEqual(url.lastPathComponent, "photo (2).webp")
+    }
+
+    func testAVIFExtension() {
+        let url = OutputPathResolver.resolve(baseName: "photo", extension: "avif", directory: tempDir)
+        XCTAssertEqual(url.lastPathComponent, "photo.avif")
     }
 }
