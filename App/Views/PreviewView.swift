@@ -1,71 +1,35 @@
 import SwiftUI
 import TinyWebPCore
 
-/// PRD §6.3: horizontal split clip-reveal comparison. `splitPosition` is pure local @State —
-/// dragging the knob never touches the ViewModel, so it never triggers a re-encode.
 struct PreviewView: View {
     @Bindable var viewModel: ConverterViewModel
-    @State private var splitPosition: Double = 0.5
 
     var body: some View {
         Group {
             if viewModel.selectedItem != nil {
-                GeometryReader { geo in
-                    splitView(size: geo.size)
-                }
+                imagePreview
             } else {
                 emptyState
             }
         }
-        .background(Color.black.opacity(0.88))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Split view
+    // MARK: - Image preview (encoded output, falls back to original while generating)
 
-    private func splitView(size: CGSize) -> some View {
-        let divY = size.height * splitPosition
-
-        return ZStack {
-            // Base: encoded (WebP/AVIF) image — shown in the lower portion
+    private var imagePreview: some View {
+        ZStack {
             if let encoded = viewModel.previewEncodedImage {
                 Image(nsImage: encoded)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: size.width, height: size.height)
-            }
-
-            // Top: original image, clipped to reveal only the top portion
-            if let original = viewModel.previewOriginalImage {
+            } else if let original = viewModel.previewOriginalImage {
                 Image(nsImage: original)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: size.width, height: size.height)
-                    .mask {
-                        VStack(spacing: 0) {
-                            Color.white.frame(height: divY)
-                            Color.clear
-                        }
-                        .frame(width: size.width, height: size.height)
-                    }
+                    .opacity(viewModel.isGeneratingPreview ? 0.4 : 0.85)
             }
 
-            // Divider line
-            Rectangle()
-                .fill(Color.white.opacity(0.8))
-                .frame(width: size.width, height: 1)
-                .position(x: size.width / 2, y: divY)
-
-            // Drag knob — local gesture, no ViewModel involvement
-            dragKnob
-                .position(x: size.width / 2, y: divY)
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            splitPosition = min(max(value.location.y / size.height, 0), 1)
-                        }
-                )
-        }
-        .overlay(alignment: .center) {
             if viewModel.isGeneratingPreview {
                 ProgressView()
                     .padding(10)
@@ -73,34 +37,19 @@ struct PreviewView: View {
             } else if let msg = viewModel.previewErrorMessage {
                 Text(msg)
                     .font(.caption)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(10)
-                    .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
                     .padding()
             }
         }
         .overlay(alignment: .bottom) {
-            formatBadges
-                .padding(12)
+            formatBadges.padding(12)
         }
     }
 
-    // MARK: - Knob
-
-    private var dragKnob: some View {
-        ZStack {
-            Circle()
-                .fill(.white)
-                .frame(width: 30, height: 30)
-                .shadow(color: .black.opacity(0.22), radius: 3, y: 1)
-            Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-        }
-    }
-
-    // MARK: - Badges
+    // MARK: - Format badges
 
     private var formatBadges: some View {
         HStack {
@@ -128,7 +77,7 @@ struct PreviewView: View {
         ContentUnavailableView(
             "No Image Selected",
             systemImage: "photo",
-            description: Text("Drop images into the panel on the right, then select one from the sidebar.")
+            description: Text("Select an image from the sidebar or upload files using the panel on the right.")
         )
     }
 }
