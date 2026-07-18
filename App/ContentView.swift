@@ -7,7 +7,6 @@ struct ContentView: View {
         @Bindable var vm = viewModel
 
         HStack(spacing: 0) {
-            // Left sidebar: thumbnail grid / list
             FileQueueView(
                 items: viewModel.queue,
                 selectedItemID: viewModel.selectedItemID,
@@ -21,17 +20,22 @@ struct ContentView: View {
 
             Divider()
 
-            // Center: before/after comparison preview
             PreviewView(viewModel: viewModel)
                 .frame(maxWidth: .infinity)
-
-            Divider()
-
-            // Right: settings + drop zone + convert
-            SettingsPanelView(viewModel: viewModel)
-                .frame(width: 264)
+        }
+        // ZStack gets .ignoresSafeArea(edges: .top) so the entire container — background
+        // and panel alike — expands to fill from window top (behind the toolbar) to bottom.
+        .overlay(alignment: .trailing) {
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                SettingsPanelView(viewModel: viewModel)
+                    .padding(8)
+            }
+            .frame(width: 288)
+            .ignoresSafeArea(edges: .top)
         }
         .frame(minWidth: 860, minHeight: 540)
+        .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .top) {
             if !viewModel.rejectedFiles.isEmpty {
                 RejectedFilesView(files: viewModel.rejectedFiles) { file in

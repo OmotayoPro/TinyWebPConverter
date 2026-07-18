@@ -2,8 +2,7 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-/// PRD §6.1: accepts drag-and-drop or a standard file picker. Compact layout for embedding
-/// inside the settings panel.
+/// Upload zone — vertical centered layout matching Figma node 217:6387.
 struct DropZoneView: View {
     var onFilesSelected: ([URL]) -> Void
 
@@ -11,38 +10,41 @@ struct DropZoneView: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(
-                    style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]),
+                    style: StrokeStyle(lineWidth: 1, dash: [5, 3]),
                     antialiased: true
                 )
-                .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary.opacity(0.35))
+                .foregroundStyle(
+                    isTargeted ? Color.accentColor : Color.primary.opacity(0.1)
+                )
 
             if isTargeted {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(Color.accentColor.opacity(0.07))
             }
 
-            HStack(spacing: 12) {
-                Image(systemName: "square.and.arrow.down.on.square")
-                    .font(.system(size: 20))
-                    .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary)
+            VStack(spacing: 16) {
+                Image(systemName: "tray.and.arrow.down")
+                    .font(.system(size: 32, weight: .medium))
+                    .foregroundStyle(isTargeted ? Color.accentColor : Color.primary.opacity(0.85))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Drop images here")
-                        .font(.system(size: 13, weight: .medium))
-                    Text("PNG · JPEG · HEIC · TIFF · GIF · BMP")
+                VStack(spacing: 8) {
+                    Text("Upload Images")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.primary.opacity(0.85))
+
+                    Text("PNG, JPEG, HEIC, TIFF, GIF & BMP")
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.5))
+                        .multilineTextAlignment(.center)
                 }
 
-                Spacer()
-
-                Button("Browse", action: presentFilePicker)
+                Button("Upload Files", action: presentFilePicker)
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .controlSize(.regular)
             }
-            .padding(.horizontal, 14)
+            .padding(.vertical, 24)
         }
         .onDrop(of: [.fileURL], isTargeted: $isTargeted, perform: handleDrop)
     }
