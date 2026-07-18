@@ -9,8 +9,8 @@ public struct ConversionResult: Sendable, Equatable {
 }
 
 /// The six-step pipeline from the session notes: validate -> decode -> transform (resize, strip
-/// metadata) -> encode as WebP -> write to disk -> report. `encodePreview` reuses the same encode
-/// step but targets memory instead of disk, for the live before/after preview.
+/// metadata) -> encode as WebP or AVIF -> write to disk -> report. `encodePreview` reuses the same
+/// encode step but targets memory instead of disk, for the live before/after preview.
 public enum ConversionPipeline {
     public static func convert(
         fileAt sourceURL: URL,
@@ -18,13 +18,18 @@ public enum ConversionPipeline {
         outputDirectory: URL,
         fileManager: FileManager = .default
     ) throws -> ConversionResult {
-        let webpData = try encodedWebPData(fileAt: sourceURL, settings: settings)
+        let encoded = try encodedData(fileAt: sourceURL, settings: settings)
 
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
-        let outputURL = OutputPathResolver.resolve(baseName: baseName, directory: outputDirectory, fileManager: fileManager)
+        let outputURL = OutputPathResolver.resolve(
+            baseName: baseName,
+            extension: settings.outputFormat.fileExtension,
+            directory: outputDirectory,
+            fileManager: fileManager
+        )
 
         do {
-            try webpData.write(to: outputURL, options: .atomic)
+            try encoded.write(to: outputURL, options: .atomic)
         } catch {
             throw ConversionError.writeFailed(underlying: error.localizedDescription)
         }
@@ -35,37 +40,38 @@ public enum ConversionPipeline {
             sourceURL: sourceURL,
             outputURL: outputURL,
             originalByteCount: originalByteCount,
-            outputByteCount: webpData.count
+            outputByteCount: encoded.count
         )
     }
 
     /// In-memory-only encode for the live preview (PRD §6.3) — nothing touches disk.
     public static func encodePreview(fileAt sourceURL: URL, settings: ConversionSettings) throws -> Data {
-        try encodedWebPData(fileAt: sourceURL, settings: settings)
+        try encodedData(fileAt: sourceURL, settings: settings)
     }
 
-    private static func encodedWebPData(fileAt sourceURL: URL, settings: ConversionSettings) throws -> Data {
+    private static func encodedData(fileAt sourceURL: URL, settings: ConversionSettings) throws -> Data {
         switch FileValidator.validate(url: sourceURL) {
-        case .failure(let error):
-            throw error
-        case .success:
-            break
+        case .failure(let error): throw error
+        case .success: break
         }
 
         let decoded = try ImageDecoder.decode(url: sourceURL)
         let targetSize = settings.resize.targetSize(for: CGSize(width: decoded.width, height: decoded.height))
         let transformed = try ImageTransformer.resized(decoded, to: targetSize)
 
-        let bitstream = try WebPEncoder.encode(image: transformed, quality: settings.quality, lossless: settings.lossless)
-
-        guard settings.keepMetadata,
-              let properties = ImageDecoder.properties(url: sourceURL),
-              let exif = ExifBlobExtractor.extract(properties: properties) else {
-            return bitstream
+        switch settings.outputFormat {
+        case .avif:
+            return try AVIFEncoder.encode(image: transformed, quality: settings.quality, lossless: settings.lossless)
+        case .webp:
+            let bitstream = try WebPEncoder.encode(image: transformed, quality: settings.quality, lossless: settings.lossless)
+            guard settings.keepMetadata,
+                  let properties = ImageDecoder.properties(url: sourceURL),
+                  let exif = ExifBlobExtractor.extract(properties: properties) else {
+                return bitstream
+            }
+            // Best-effort: if muxing metadata back in fails for any reason, ship the (already valid)
+            // metadata-stripped bitstream rather than failing the whole conversion.
+            return (try? WebPMetadataWriter.attachingExif(exif, to: bitstream)) ?? bitstream
         }
-
-        // Best-effort: if muxing metadata back in fails for any reason, ship the (already valid)
-        // metadata-stripped bitstream rather than failing the whole conversion.
-        return (try? WebPMetadataWriter.attachingExif(exif, to: bitstream)) ?? bitstream
     }
 }

@@ -4,65 +4,64 @@ struct ContentView: View {
     @State private var viewModel = ConverterViewModel()
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                Text("Tiny WebP Converter")
-                    .font(.title2)
-                    .bold()
+        @Bindable var vm = viewModel
 
-                if !viewModel.rejectedFiles.isEmpty {
-                    RejectedFilesView(files: viewModel.rejectedFiles) { file in
-                        viewModel.dismissRejectedFile(file)
-                    }
-                }
+        HStack(spacing: 0) {
+            // Left sidebar: thumbnail grid / list
+            FileQueueView(
+                items: viewModel.queue,
+                selectedItemID: viewModel.selectedItemID,
+                viewMode: viewModel.viewMode,
+                isCollapsed: viewModel.isSidebarCollapsed,
+                onSelect: { viewModel.selectItem($0) },
+                onRemove: { viewModel.removeItem($0) }
+            )
+            .frame(width: viewModel.isSidebarCollapsed ? 72 : 216)
+            .animation(.spring(duration: 0.25), value: viewModel.isSidebarCollapsed)
 
-                PreviewView(viewModel: viewModel)
+            Divider()
 
-                SettingsPanelView(viewModel: viewModel)
+            // Center: before/after comparison preview
+            PreviewView(viewModel: viewModel)
+                .frame(maxWidth: .infinity)
 
-                if viewModel.queue.isEmpty {
-                    DropZoneView { urls in
-                        viewModel.addFiles(urls)
-                    }
-                } else {
-                    FileQueueView(
-                        items: viewModel.queue,
-                        selectedItemID: viewModel.selectedItemID,
-                        onRemove: { viewModel.removeItem($0) },
-                        onSelect: { viewModel.selectItem($0) }
-                    )
-                    .frame(minHeight: 160)
+            Divider()
 
-                    DropZoneView { urls in
-                        viewModel.addFiles(urls)
-                    }
-                    .frame(height: 90)
-
-                    HStack {
-                        Button("Clear", role: .destructive) {
-                            viewModel.clearQueue()
-                        }
-                        .disabled(viewModel.isConverting)
-
-                        Spacer()
-
-                        Button {
-                            Task { await viewModel.convertAll() }
-                        } label: {
-                            if viewModel.isConverting {
-                                ProgressView().controlSize(.small)
-                            } else {
-                                Text("Convert \(viewModel.queue.count) Image\(viewModel.queue.count == 1 ? "" : "s")")
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(viewModel.isConverting)
-                    }
-                }
-            }
-            .padding()
+            // Right: settings + drop zone + convert
+            SettingsPanelView(viewModel: viewModel)
+                .frame(width: 264)
         }
-        .frame(minWidth: 560, minHeight: 700)
+        .frame(minWidth: 860, minHeight: 540)
+        .overlay(alignment: .top) {
+            if !viewModel.rejectedFiles.isEmpty {
+                RejectedFilesView(files: viewModel.rejectedFiles) { file in
+                    viewModel.dismissRejectedFile(file)
+                }
+                .padding()
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.2), value: viewModel.rejectedFiles.count)
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                Button {
+                    withAnimation(.spring(duration: 0.25)) {
+                        viewModel.isSidebarCollapsed.toggle()
+                    }
+                } label: {
+                    Image(systemName: "sidebar.left")
+                }
+                .help("Toggle Sidebar")
+
+                Picker("View Mode", selection: $vm.viewMode) {
+                    Image(systemName: "square.grid.2x2").tag(ViewMode.grid)
+                    Image(systemName: "list.bullet").tag(ViewMode.list)
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .help("Switch between grid and list view")
+            }
+        }
     }
 }
 

@@ -3,6 +3,11 @@ import Observation
 import AppKit
 import TinyWebPCore
 
+enum ViewMode: String, CaseIterable {
+    case grid = "Grid"
+    case list = "List"
+}
+
 @MainActor
 @Observable
 final class ConverterViewModel {
@@ -16,23 +21,24 @@ final class ConverterViewModel {
     private(set) var rejectedFiles: [RejectedFile] = []
     private(set) var isConverting = false
 
-    /// PRD §6.2: resets to defaults every launch - nothing here is persisted.
+    var isSidebarCollapsed = false
+    var viewMode: ViewMode = .grid
+
+    /// PRD §6.2: resets to defaults every launch — nothing here is persisted.
     var settings = ConversionSettings() {
         didSet { schedulePreviewUpdate() }
     }
-    /// `nil` means "same folder as source" (PRD §6.2 default); set to override for the whole batch.
+    /// `nil` means "same folder as source" (PRD §6.2 default).
     var outputDirectoryOverride: URL?
 
     var selectedItemID: BatchItem.ID? {
         didSet { schedulePreviewUpdate() }
     }
-    /// 0 shows only the original, 1 shows only the WebP-encoded preview.
-    var previewRevealAmount: Double = 0.5
 
     private(set) var previewOriginalImage: NSImage?
-    private(set) var previewWebPImage: NSImage?
+    private(set) var previewEncodedImage: NSImage?
     private(set) var previewOriginalByteCount: Int?
-    private(set) var previewWebPByteCount: Int?
+    private(set) var previewEncodedByteCount: Int?
     private(set) var isGeneratingPreview = false
     private(set) var previewErrorMessage: String?
 
@@ -52,8 +58,7 @@ final class ConverterViewModel {
         selectedItemID = item.id
     }
 
-    /// PRD §6.1: sniffs each file's real format and rejects anything outside the curated list,
-    /// reporting "File not added" with a reason rather than failing silently.
+    /// PRD §6.1: sniffs each file's real format and rejects anything outside the curated list.
     func addFiles(_ urls: [URL]) {
         let hadNoSelection = selectedItemID == nil
 
@@ -92,24 +97,26 @@ final class ConverterViewModel {
     func clearQueue() {
         queue.removeAll()
         selectedItemID = nil
+        previewTask?.cancel()
+        previewOriginalImage = nil
+        previewEncodedImage = nil
+        previewOriginalByteCount = nil
+        previewEncodedByteCount = nil
+        previewErrorMessage = nil
     }
 
     func dismissRejectedFile(_ file: RejectedFile) {
         rejectedFiles.removeAll { $0.id == file.id }
     }
 
-    /// Converts every queued file with the current settings (PRD §6.3 reuses this same encode
-    /// step for the live preview, targeting memory instead of disk).
     func convertAll() async {
         guard !queue.isEmpty, !isConverting else { return }
         isConverting = true
         defer { isConverting = false }
 
-        let urls = queue.map(\.sourceURL)
-
         do {
             let results = try await BatchConverter.convert(
-                sourceURLs: urls,
+                sourceURLs: queue.map(\.sourceURL),
                 settings: settings,
                 outputDirectory: outputDirectoryOverride,
                 fileManager: fileManager
@@ -122,8 +129,7 @@ final class ConverterViewModel {
                 applyStatus(id: result.id, status: result.status)
             }
         } catch {
-            // Batch-level failure (currently only the 50-image cap, already enforced at add
-            // time) - nothing per-item to update.
+            // Batch-level errors (e.g. cap exceeded) are enforced at add time.
         }
     }
 
@@ -132,16 +138,15 @@ final class ConverterViewModel {
         queue[index].status = status
     }
 
-    /// PRD §6.3: preview updates are debounced - only re-encode once the user pauses adjusting
-    /// settings, not on every slider tick.
+    /// PRD §6.3: debounced — only re-encodes after the user pauses adjusting settings.
     private func schedulePreviewUpdate() {
         previewTask?.cancel()
 
         guard let item = selectedItem else {
             previewOriginalImage = nil
-            previewWebPImage = nil
+            previewEncodedImage = nil
             previewOriginalByteCount = nil
-            previewWebPByteCount = nil
+            previewEncodedByteCount = nil
             previewErrorMessage = nil
             return
         }
@@ -149,7 +154,7 @@ final class ConverterViewModel {
         let url = item.sourceURL
         let currentSettings = settings
         previewTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(300))
+            try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
             await self?.generatePreview(for: url, settings: currentSettings)
         }
@@ -161,17 +166,25 @@ final class ConverterViewModel {
         defer { isGeneratingPreview = false }
 
         do {
-            let data = try ConversionPipeline.encodePreview(fileAt: url, settings: settings)
+            // Run the CPU-intensive encode off the main actor so the UI stays responsive.
+            let (encodedData, originalData, originalByteCount): (Data, Data?, Int?) =
+                try await Task.detached(priority: .userInitiated) {
+                    let encoded = try ConversionPipeline.encodePreview(fileAt: url, settings: settings)
+                    let original = try? Data(contentsOf: url)
+                    let byteCount = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int
+                    return (encoded, original, byteCount)
+                }.value
+
             guard !Task.isCancelled else { return }
-            previewWebPByteCount = data.count
-            previewWebPImage = NSImage(data: data)
-            previewOriginalImage = NSImage(contentsOf: url)
-            previewOriginalByteCount = (try? fileManager.attributesOfItem(atPath: url.path))?[.size] as? Int
+            previewEncodedByteCount = encodedData.count
+            previewEncodedImage = NSImage(data: encodedData)
+            if let originalData { previewOriginalImage = NSImage(data: originalData) }
+            previewOriginalByteCount = originalByteCount
         } catch {
             guard !Task.isCancelled else { return }
             previewErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Couldn't generate a preview."
-            previewWebPImage = nil
-            previewWebPByteCount = nil
+            previewEncodedImage = nil
+            previewEncodedByteCount = nil
         }
     }
 }

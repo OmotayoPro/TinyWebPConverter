@@ -7,5 +7,6 @@ struct TinyWebPConverterApp: App {
         WindowGroup {
             ContentView()
         }
+        .windowToolbarStyle(.unified(showsTitle: false))
     }
 }
