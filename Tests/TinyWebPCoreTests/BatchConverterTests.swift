@@ -108,8 +108,8 @@ final class BatchConverterTests: XCTestCase {
         let recorder = StatusRecorder()
         _ = try await BatchConverter.convert(
             sourceURLs: sources, settings: ConversionSettings(), outputDirectory: tempDir, concurrencyLimit: 2
-        ) { id, status in
-            recorder.record(id: id, status: status)
+        ) { url, status in
+            recorder.record(url: url, status: status)
         }
 
         let byItem = recorder.eventsByItem()
@@ -126,15 +126,15 @@ final class BatchConverterTests: XCTestCase {
 /// Serializes concurrent status-callback writes for the test above.
 private final class StatusRecorder: @unchecked Sendable {
     private let lock = NSLock()
-    private var events: [(UUID, BatchItemStatus)] = []
+    private var events: [(URL, BatchItemStatus)] = []
 
-    func record(id: UUID, status: BatchItemStatus) {
+    func record(url: URL, status: BatchItemStatus) {
         lock.lock()
         defer { lock.unlock() }
-        events.append((id, status))
+        events.append((url, status))
     }
 
-    func eventsByItem() -> [UUID: [BatchItemStatus]] {
+    func eventsByItem() -> [URL: [BatchItemStatus]] {
         lock.lock()
         defer { lock.unlock() }
         return Dictionary(grouping: events, by: { $0.0 }).mapValues { $0.map(\.1) }

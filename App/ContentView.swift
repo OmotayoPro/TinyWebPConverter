@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var viewModel = ConverterViewModel()
+    @State private var showConfetti = false
 
     // Height of the minimized card: proportional to item count, capped at 380pt.
     // Each collapsed cell is 54pt (48pt thumb + 6pt spacing); header + padding ≈ 46pt.
@@ -95,6 +96,39 @@ struct ContentView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
+
+            // ── Success toast (lower left, 60s or manual dismiss) ───────────
+            .overlay(alignment: .bottomLeading) {
+                if viewModel.showSuccessToast {
+                    SuccessToastView(
+                        onView: {
+                            viewModel.revealConvertedFiles()
+                            viewModel.dismissSuccessToast()
+                        },
+                        onDismiss: { viewModel.dismissSuccessToast() }
+                    )
+                    .padding(16)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(duration: 0.35, bounce: 0.2), value: viewModel.showSuccessToast)
+
+            // ── Confetti burst on conversion success ────────────────────────
+            .overlay {
+                if showConfetti {
+                    ConfettiBurstView()
+                        .id(viewModel.confettiBurstID)   // restart on repeat conversions
+                        .ignoresSafeArea()
+                }
+            }
+            .onChange(of: viewModel.confettiBurstID) { _, burst in
+                showConfetti = true
+                Task {
+                    // Confetti lifetime (4s) plus the max particle delay
+                    try? await Task.sleep(for: .seconds(4.3))
+                    if viewModel.confettiBurstID == burst { showConfetti = false }
+                }
+            }
     }
 
     // Shared FileQueueView instance configured for current state

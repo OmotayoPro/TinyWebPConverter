@@ -238,11 +238,11 @@ private struct ThumbnailCell: View {
                 .frame(width: thumbSize, height: thumbSize)
             ProgressView().tint(.white).controlSize(.small)
         case .done:
+            // Centered on the thumbnail; shadow keeps it legible on light images
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.white, Color.green)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .padding(4)
+                .font(.system(size: 16, weight: .semibold))
+                .shadow(color: .black.opacity(0.35), radius: 3)
         case .failed:
             Image(systemName: "exclamationmark.circle.fill")
                 .foregroundStyle(.white, Color.orange)

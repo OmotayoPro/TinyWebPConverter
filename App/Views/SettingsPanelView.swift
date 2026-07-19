@@ -245,13 +245,17 @@ struct SettingsPanelView: View {
 
     private var convertButton: some View {
         Button {
-            Task { await viewModel.convertAll() }
+            if viewModel.conversionFinished {
+                viewModel.clearQueue()
+            } else {
+                Task { await viewModel.convertAll() }
+            }
         } label: {
             HStack(spacing: 6) {
                 if viewModel.isConverting {
                     ProgressView().controlSize(.small).tint(.white)
                 }
-                Text(viewModel.isConverting ? "Converting…" : "Convert Images")
+                Text(convertButtonTitle)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white)
             }
@@ -266,6 +270,12 @@ struct SettingsPanelView: View {
             in: Capsule()
         )
         .disabled(viewModel.queue.isEmpty || viewModel.isConverting)
+    }
+
+    private var convertButtonTitle: String {
+        if viewModel.isConverting { return "Converting…" }
+        if viewModel.conversionFinished { return "Clear Files" }
+        return "Convert Images"
     }
 
     // MARK: - Helpers
