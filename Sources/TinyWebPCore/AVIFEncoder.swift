@@ -10,7 +10,10 @@ enum AVIFEncoder {
         ) else {
             throw ConversionError.encodeFailed
         }
-        let q = lossless ? 1.0 : Double(quality) / 100.0
+        // ImageIO's AVIF encoder fails to finalize at exactly 1.0 (it has no
+        // lossless AV1 support), so cap at 0.99 — the UI hides the lossless
+        // option for AVIF, but this keeps direct API callers from failing.
+        let q = min(lossless ? 1.0 : Double(quality) / 100.0, 0.99)
         CGImageDestinationAddImage(destination, image,
             [kCGImageDestinationLossyCompressionQuality: q] as CFDictionary)
         guard CGImageDestinationFinalize(destination) else {

@@ -17,7 +17,7 @@ public enum ConversionError: Error, LocalizedError, Equatable, Sendable {
         case .decodeFailed, .corruptedImage:
             return "This file appears to be corrupted or unreadable."
         case .encodeFailed:
-            return "WebP encoding failed."
+            return "Image encoding failed."
         case .writeFailed(let underlying):
             return "Couldn't write the output file: \(underlying)"
         }
