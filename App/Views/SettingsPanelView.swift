@@ -207,15 +207,23 @@ struct SettingsPanelView: View {
         .frame(height: 44)
     }
 
+    /// Chosen folder > folder of the first queued image > "Source" placeholder.
+    private var outputFolderDisplay: String {
+        if let override = viewModel.outputDirectoryOverride {
+            return "~/.../\(override.lastPathComponent)"
+        }
+        if let firstURL = viewModel.queue.first?.sourceURL {
+            return "~/.../\(firstURL.deletingLastPathComponent().lastPathComponent)"
+        }
+        return "Source"
+    }
+
     private var outputFolderRow: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     rowLabel("Output Folder")
-                    Text(
-                        viewModel.outputDirectoryOverride.map { "~/.../\($0.lastPathComponent)" }
-                            ?? "~/...WebP Converter"
-                    )
+                    Text(outputFolderDisplay)
                     .font(.system(size: 13))
                     .foregroundStyle(Color.primary.opacity(0.5))
                     .lineLimit(1)
