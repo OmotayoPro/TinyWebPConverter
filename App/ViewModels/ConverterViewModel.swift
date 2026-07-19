@@ -32,7 +32,11 @@ final class ConverterViewModel {
     var outputDirectoryOverride: URL?
 
     var selectedItemID: BatchItem.ID? {
-        didSet { schedulePreviewUpdate() }
+        didSet {
+            guard oldValue != selectedItemID else { return }
+            showSelectedOriginalImmediately()
+            schedulePreviewUpdate()
+        }
     }
     private(set) var selectedItemIDs: Set<BatchItem.ID> = []
     private var anchorItemID: BatchItem.ID?
@@ -55,8 +59,16 @@ final class ConverterViewModel {
     private(set) var isGeneratingPreview = false
     private(set) var previewErrorMessage: String?
 
+    // Success state: bumps `confettiBurstID` to fire the confetti and shows the
+    // toast for 60s (or until dismissed / the next conversion replaces it).
+    private(set) var showSuccessToast = false
+    private(set) var confettiBurstID = 0
+    private var successOutputURLs: [URL] = []
+    private var toastDismissTask: Task<Void, Never>?
+
     private let fileManager: FileManager
     private var previewTask: Task<Void, Never>?
+    private var originalLoadTask: Task<Void, Never>?
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -65,6 +77,17 @@ final class ConverterViewModel {
     var selectedItem: BatchItem? {
         guard let selectedItemID else { return nil }
         return queue.first { $0.id == selectedItemID }
+    }
+
+    /// True once every file in the queue has finished (converted or failed) —
+    /// the Convert button switches to "Clear Files" in this state.
+    var conversionFinished: Bool {
+        !queue.isEmpty && queue.allSatisfy { item in
+            switch item.status {
+            case .done, .failed: true
+            case .pending, .converting: false
+            }
+        }
     }
 
     func selectItem(_ item: BatchItem, modifiers: NSEvent.ModifierFlags = []) {
@@ -182,22 +205,82 @@ final class ConverterViewModel {
                 settings: settings,
                 outputDirectory: outputDirectoryOverride,
                 fileManager: fileManager
-            ) { [weak self] id, status in
+            ) { [weak self] sourceURL, status in
                 Task { @MainActor in
-                    self?.applyStatus(id: id, status: status)
+                    self?.applyStatus(sourceURL: sourceURL, status: status)
                 }
             }
             for result in results {
-                applyStatus(id: result.id, status: result.status)
+                applyStatus(sourceURL: result.sourceURL, status: result.status)
+            }
+
+            let convertedURLs = results.compactMap { item -> URL? in
+                if case .done(let result) = item.status { return result.outputURL }
+                return nil
+            }
+            if !convertedURLs.isEmpty {
+                celebrateSuccess(outputURLs: convertedURLs)
             }
         } catch {
             // Batch-level errors (e.g. cap exceeded) are enforced at add time.
         }
     }
 
-    private func applyStatus(id: UUID, status: BatchItemStatus) {
-        guard let index = queue.firstIndex(where: { $0.id == id }) else { return }
+    private func celebrateSuccess(outputURLs: [URL]) {
+        successOutputURLs = outputURLs
+        confettiBurstID += 1
+        showSuccessToast = true
+
+        toastDismissTask?.cancel()
+        toastDismissTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(60))
+            guard !Task.isCancelled else { return }
+            self?.showSuccessToast = false
+        }
+    }
+
+    func dismissSuccessToast() {
+        toastDismissTask?.cancel()
+        showSuccessToast = false
+    }
+
+    /// Opens Finder with the converted files selected.
+    func revealConvertedFiles() {
+        guard !successOutputURLs.isEmpty else { return }
+        NSWorkspace.shared.activateFileViewerSelecting(successOutputURLs)
+    }
+
+    // Queue items are unique by sourceURL (enforced in addFiles), so it's a safe
+    // key for matching the converter's progress reports back to the sidebar.
+    private func applyStatus(sourceURL: URL, status: BatchItemStatus) {
+        guard let index = queue.firstIndex(where: { $0.sourceURL == sourceURL }) else { return }
         queue[index].status = status
+    }
+
+    /// Swaps the preview to the newly selected image right away, so the encode
+    /// shimmer plays over the new image instead of the previously displayed one.
+    private func showSelectedOriginalImmediately() {
+        originalLoadTask?.cancel()
+        previewEncodedImage = nil
+        previewEncodedByteCount = nil
+        previewErrorMessage = nil
+
+        guard let url = selectedItem?.sourceURL else {
+            previewOriginalImage = nil
+            previewOriginalByteCount = nil
+            return
+        }
+
+        originalLoadTask = Task { [weak self] in
+            let (data, byteCount): (Data?, Int?) = await Task.detached(priority: .userInitiated) {
+                let data = try? Data(contentsOf: url)
+                let bytes = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int
+                return (data, bytes)
+            }.value
+            guard let self, !Task.isCancelled, self.selectedItem?.sourceURL == url else { return }
+            if let data { self.previewOriginalImage = NSImage(data: data) }
+            self.previewOriginalByteCount = byteCount
+        }
     }
 
     /// PRD §6.3: debounced — only re-encodes after the user pauses adjusting settings.

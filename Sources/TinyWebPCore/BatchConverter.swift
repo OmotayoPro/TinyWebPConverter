@@ -47,7 +47,7 @@ public enum BatchConverter {
         outputDirectory: URL? = nil,
         concurrencyLimit: Int = defaultConcurrencyLimit,
         fileManager: FileManager = .default,
-        onStatusChange: (@Sendable (_ itemID: UUID, _ status: BatchItemStatus) -> Void)? = nil
+        onStatusChange: (@Sendable (_ sourceURL: URL, _ status: BatchItemStatus) -> Void)? = nil
     ) async throws -> [BatchItem] {
         guard sourceURLs.count <= maxBatchSize else {
             throw BatchConversionError.batchTooLarge(count: sourceURLs.count, limit: maxBatchSize)
@@ -68,7 +68,7 @@ public enum BatchConverter {
                 let url = items[index].sourceURL
 
                 items[index].status = .converting
-                onStatusChange?(items[index].id, .converting)
+                onStatusChange?(url, .converting)
 
                 group.addTask {
                     let destination = outputDirectory ?? url.deletingLastPathComponent()
@@ -94,7 +94,7 @@ public enum BatchConverter {
 
             while let (index, status) = await group.next() {
                 items[index].status = status
-                onStatusChange?(items[index].id, status)
+                onStatusChange?(items[index].sourceURL, status)
                 startNext()
             }
         }

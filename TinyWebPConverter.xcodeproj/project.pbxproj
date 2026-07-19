@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		30B5082CC3402B88AA60DDED /* FileQueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59191D93BE5305B3A7F02ED0 /* FileQueueView.swift */; };
+		7B2117DD300CE71400A1B14D /* ConversionSuccessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B2117DC300CE71400A1B14D /* ConversionSuccessViews.swift */; };
 		886B782073697B352B24E8F5 /* TinyWebPCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8DDFB76FDD06BC4F7AE55B46 /* TinyWebPCore */; };
 		89D891B71161E8DA26F52620 /* RejectedFilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCA2A9AF63208A2B0F9F4AFC /* RejectedFilesView.swift */; };
 		8A376CD8C56D5D50E86C1785 /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F13531C4E91082712189B4 /* PreviewView.swift */; };
@@ -26,6 +27,7 @@
 		46F13531C4E91082712189B4 /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
 		59191D93BE5305B3A7F02ED0 /* FileQueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileQueueView.swift; sourceTree = "<group>"; };
 		6FC2D6095C082719C300B442 /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
+		7B2117DC300CE71400A1B14D /* ConversionSuccessViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversionSuccessViews.swift; sourceTree = "<group>"; };
 		7C2355DF1D7285CB38914E38 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		9629567D3AA787F8CEEBE465 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CC9D79BA67F975B759A1EB90 /* TinyWebPConverter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TinyWebPConverter.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -89,6 +91,7 @@
 				46F13531C4E91082712189B4 /* PreviewView.swift */,
 				CCA2A9AF63208A2B0F9F4AFC /* RejectedFilesView.swift */,
 				090F420B5158E852B0149417 /* SettingsPanelView.swift */,
+				7B2117DC300CE71400A1B14D /* ConversionSuccessViews.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -185,6 +188,7 @@
 				89D891B71161E8DA26F52620 /* RejectedFilesView.swift in Sources */,
 				C8794E7096CABF7CF24E854E /* SettingsPanelView.swift in Sources */,
 				DF8AE01F0DBB952553FD23E2 /* TinyWebPConverterApp.swift in Sources */,
+				7B2117DD300CE71400A1B14D /* ConversionSuccessViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var viewModel = ConverterViewModel()
+    @State private var showConfetti = false
 
     // Height of the minimized card: proportional to item count, capped at 380pt.
     // Each collapsed cell is 54pt (48pt thumb + 6pt spacing); header + padding ≈ 46pt.
@@ -16,39 +17,31 @@ struct ContentView: View {
 
         PreviewView(viewModel: viewModel)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(16)
+            // Inset the preview so it ends at the inspector's leading edge (288pt panel)
+            .padding(.trailing, 280)
 
             // ── Sidebar ─────────────────────────────────────────────────────
             .overlay(alignment: .leading) {
-                if viewModel.isSidebarCollapsed {
-                    // Minimized: naturally-sized card centred vertically
-                    VStack {
-                        Spacer()
+                // Sidebar stays hidden entirely until files have been uploaded.
+                // A single card whose frame morphs between expanded (236pt, full
+                // height) and minimized (64pt, centred) so the spring animates one
+                // view instead of cross-fading two differently-shaped ones.
+                if !viewModel.queue.isEmpty {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
                         sidebarView
-                            .frame(height: collapsedCardHeight)
+                            .frame(width: viewModel.isSidebarCollapsed ? 64 : 236)
+                            .frame(maxHeight: viewModel.isSidebarCollapsed ? collapsedCardHeight : .infinity)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                            .padding(.horizontal, 8)
-                        Spacer()
+                            .shadow(color: .black.opacity(0.2), radius: 30, x: 0, y: 4)
+                            .shadow(color: .black.opacity(0.15), radius: 15, x: -2, y: 0)
+                        Spacer(minLength: 0)
                     }
-                    .frame(width: 80)
+                    .padding(8)
                     .ignoresSafeArea(edges: .top)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.88, anchor: .leading).combined(with: .opacity),
-                        removal:   .scale(scale: 0.88, anchor: .leading).combined(with: .opacity)
-                    ))
-                } else {
-                    // Expanded: full-height card (extends behind toolbar)
-                    sidebarView
-                        .frame(maxHeight: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                        .padding(8)
-                        .frame(width: 252)   // card = 236 + 8px gap each side
-                        .ignoresSafeArea(edges: .top)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal:   .move(edge: .leading).combined(with: .opacity)
-                        ))
+                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
             }
             .animation(.spring(duration: 0.35, bounce: 0.2), value: viewModel.isSidebarCollapsed)
@@ -65,7 +58,13 @@ struct ContentView: View {
             }
 
             .frame(minWidth: 860, minHeight: 540)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background {
+                ZStack {
+                    Color(nsColor: .windowBackgroundColor)
+                    DotGridBackground()
+                }
+                .ignoresSafeArea()
+            }
             .overlay(alignment: .top) {
                 if !viewModel.rejectedFiles.isEmpty {
                     RejectedFilesView(files: viewModel.rejectedFiles) { file in
@@ -97,6 +96,39 @@ struct ContentView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
+
+            // ── Success toast (lower left, 60s or manual dismiss) ───────────
+            .overlay(alignment: .bottomLeading) {
+                if viewModel.showSuccessToast {
+                    SuccessToastView(
+                        onView: {
+                            viewModel.revealConvertedFiles()
+                            viewModel.dismissSuccessToast()
+                        },
+                        onDismiss: { viewModel.dismissSuccessToast() }
+                    )
+                    .padding(16)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(duration: 0.35, bounce: 0.2), value: viewModel.showSuccessToast)
+
+            // ── Confetti burst on conversion success ────────────────────────
+            .overlay {
+                if showConfetti {
+                    ConfettiBurstView()
+                        .id(viewModel.confettiBurstID)   // restart on repeat conversions
+                        .ignoresSafeArea()
+                }
+            }
+            .onChange(of: viewModel.confettiBurstID) { _, burst in
+                showConfetti = true
+                Task {
+                    // Confetti lifetime (4s) plus the max particle delay
+                    try? await Task.sleep(for: .seconds(4.3))
+                    if viewModel.confettiBurstID == burst { showConfetti = false }
+                }
+            }
     }
 
     // Shared FileQueueView instance configured for current state
@@ -112,6 +144,27 @@ struct ContentView: View {
             onDeleteSelected: { viewModel.removeSelectedItems() },
             onToggleSelectAll: { viewModel.toggleSelectAll() }
         )
+    }
+}
+
+// MARK: - Dotted particle grid background
+
+private struct DotGridBackground: View {
+    var body: some View {
+        Canvas { context, size in
+            let spacing: CGFloat = 10
+            let dotSize: CGFloat = 1.5
+            var y = spacing / 2
+            while y < size.height {
+                var x = spacing / 2
+                while x < size.width {
+                    let rect = CGRect(x: x - dotSize / 2, y: y - dotSize / 2, width: dotSize, height: dotSize)
+                    context.fill(Path(ellipseIn: rect), with: .color(.primary.opacity(0.05)))
+                    x += spacing
+                }
+                y += spacing
+            }
+        }
     }
 }
 
