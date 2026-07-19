@@ -34,6 +34,19 @@ final class ConverterViewModel {
     var selectedItemID: BatchItem.ID? {
         didSet { schedulePreviewUpdate() }
     }
+    private(set) var selectedItemIDs: Set<BatchItem.ID> = []
+    private var anchorItemID: BatchItem.ID?
+
+    var allSelected: Bool { !queue.isEmpty && queue.allSatisfy { selectedItemIDs.contains($0.id) } }
+
+    func toggleSelectAll() {
+        if allSelected {
+            selectedItemIDs.removeAll()
+        } else {
+            selectedItemIDs = Set(queue.map(\.id))
+            anchorItemID = queue.last?.id
+        }
+    }
 
     private(set) var previewOriginalImage: NSImage?
     private(set) var previewEncodedImage: NSImage?
@@ -54,8 +67,49 @@ final class ConverterViewModel {
         return queue.first { $0.id == selectedItemID }
     }
 
-    func selectItem(_ item: BatchItem) {
-        selectedItemID = item.id
+    func selectItem(_ item: BatchItem, modifiers: NSEvent.ModifierFlags = []) {
+        let flags = modifiers.intersection(.deviceIndependentFlagsMask)
+        if flags.contains(.command) {
+            if selectedItemIDs.contains(item.id) {
+                selectedItemIDs.remove(item.id)
+                if selectedItemID == item.id {
+                    // Move preview to first remaining selected item (queue-ordered)
+                    selectedItemID = queue.first(where: { selectedItemIDs.contains($0.id) })?.id
+                }
+            } else {
+                selectedItemIDs.insert(item.id)
+                selectedItemID = item.id
+                anchorItemID = item.id
+            }
+        } else if flags.contains(.shift),
+                  let anchor = anchorItemID,
+                  let anchorIdx = queue.firstIndex(where: { $0.id == anchor }),
+                  let clickedIdx = queue.firstIndex(where: { $0.id == item.id }) {
+            let lo = min(anchorIdx, clickedIdx)
+            let hi = max(anchorIdx, clickedIdx)
+            selectedItemIDs = Set(queue[lo...hi].map(\.id))
+            selectedItemID = item.id
+        } else {
+            selectedItemIDs = [item.id]
+            selectedItemID = item.id
+            anchorItemID = item.id
+        }
+    }
+
+    func removeSelectedItems() {
+        guard !selectedItemIDs.isEmpty else { return }
+        let firstIdx = queue.firstIndex(where: { selectedItemIDs.contains($0.id) })
+        queue.removeAll { selectedItemIDs.contains($0.id) }
+        selectedItemIDs.removeAll()
+        anchorItemID = nil
+        if let idx = firstIdx, !queue.isEmpty {
+            let item = queue[min(idx, queue.count - 1)]
+            selectedItemID = item.id
+            selectedItemIDs = [item.id]
+            anchorItemID = item.id
+        } else {
+            selectedItemID = nil
+        }
     }
 
     /// PRD §6.1: sniffs each file's real format and rejects anything outside the curated list.
@@ -84,19 +138,27 @@ final class ConverterViewModel {
         }
 
         if hadNoSelection, let first = queue.first {
-            selectItem(first)
+            selectItem(first)  // no modifiers → single-select
         }
     }
 
     func removeItem(_ item: BatchItem) {
         queue.removeAll { $0.id == item.id }
+        selectedItemIDs.remove(item.id)
+        if item.id == anchorItemID { anchorItemID = nil }
         guard selectedItemID == item.id else { return }
         selectedItemID = queue.first?.id
+        if let id = selectedItemID {
+            selectedItemIDs = [id]
+            anchorItemID = id
+        }
     }
 
     func clearQueue() {
         queue.removeAll()
         selectedItemID = nil
+        selectedItemIDs.removeAll()
+        anchorItemID = nil
         previewTask?.cancel()
         previewOriginalImage = nil
         previewEncodedImage = nil

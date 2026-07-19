@@ -5,25 +5,82 @@ import TinyWebPCore
 
 struct FileQueueView: View {
     var items: [BatchItem]
-    var selectedItemID: BatchItem.ID?
+    var selectedItemIDs: Set<BatchItem.ID>
     var viewMode: ViewMode
     var isCollapsed: Bool
-    var onSelect: (BatchItem) -> Void
+    var allSelected: Bool
+    var onTap: (BatchItem, NSEvent.ModifierFlags) -> Void
     var onRemove: (BatchItem) -> Void
+    var onDeleteSelected: () -> Void
+    var onToggleSelectAll: () -> Void
+
+    @FocusState private var isFocused: Bool
 
     var body: some View {
-        ScrollView {
-            if items.isEmpty {
-                emptyPlaceholder
-            } else if isCollapsed {
-                collapsedGrid
-            } else if viewMode == .grid {
-                expandedGrid
-            } else {
-                listLayout
+        VStack(spacing: 0) {
+            header
+            ScrollView {
+                if items.isEmpty {
+                    emptyPlaceholder
+                } else if isCollapsed {
+                    collapsedList
+                } else if viewMode == .grid {
+                    expandedGrid
+                } else {
+                    listLayout
+                }
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(Color.clear)
+        .focusable()
+        .focused($isFocused)
+        .focusEffectDisabled()
+        .onDeleteCommand { onDeleteSelected() }
+    }
+
+    // MARK: - Header
+
+    @ViewBuilder
+    private var header: some View {
+        if isCollapsed {
+            HStack {
+                Circle()
+                    .fill(Color.accentColor)
+                    .frame(width: 10, height: 10)
+                Spacer()
+                Button { onToggleSelectAll() } label: {
+                    Text(allSelected ? "Desel." : "Select")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(allSelected ? Color.accentColor : Color.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
+        } else {
+            HStack(alignment: .center, spacing: 4) {
+                Text("Files")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("(\(items.count))")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button { onToggleSelectAll() } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: allSelected ? "checkmark.square.fill" : "square")
+                            .font(.system(size: 12))
+                        Text("Select All")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundStyle(allSelected ? Color.accentColor : Color.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 48)
+            .padding(.bottom, 8)
+        }
     }
 
     // MARK: - Layouts
@@ -36,32 +93,39 @@ struct FileQueueView: View {
             ForEach(items) { item in
                 ThumbnailCell(
                     item: item,
-                    isSelected: item.id == selectedItemID,
+                    isSelected: selectedItemIDs.contains(item.id),
                     thumbSize: 68,
                     showLabel: true
                 )
-                .onTapGesture { onSelect(item) }
+                .onTapGesture {
+                    isFocused = true
+                    let mods = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
+                    onTap(item, mods)
+                }
             }
         }
         .padding(8)
     }
 
-    private var collapsedGrid: some View {
-        LazyVGrid(
-            columns: [GridItem(.flexible())],
-            spacing: 8
-        ) {
+    // Single-column layout for the minimized/collapsed card
+    private var collapsedList: some View {
+        LazyVStack(spacing: 6) {
             ForEach(items) { item in
                 ThumbnailCell(
                     item: item,
-                    isSelected: item.id == selectedItemID,
+                    isSelected: selectedItemIDs.contains(item.id),
                     thumbSize: 48,
                     showLabel: false
                 )
-                .onTapGesture { onSelect(item) }
+                .onTapGesture {
+                    isFocused = true
+                    let mods = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
+                    onTap(item, mods)
+                }
             }
         }
-        .padding(8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
     }
 
     private var listLayout: some View {
@@ -69,14 +133,13 @@ struct FileQueueView: View {
             ForEach(items) { item in
                 ListCell(
                     item: item,
-                    isSelected: item.id == selectedItemID,
+                    isSelected: selectedItemIDs.contains(item.id),
                     onRemove: { onRemove(item) }
                 )
-                .onTapGesture { onSelect(item) }
-
-                if item.id != items.last?.id {
-                    Divider()
-                        .padding(.leading, 52)
+                .onTapGesture {
+                    isFocused = true
+                    let mods = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
+                    onTap(item, mods)
                 }
             }
         }
@@ -85,14 +148,16 @@ struct FileQueueView: View {
     private var emptyPlaceholder: some View {
         VStack(spacing: 10) {
             Image(systemName: "photo.stack")
-                .font(.system(size: 28))
+                .font(.system(size: isCollapsed ? 18 : 28))
                 .foregroundStyle(.tertiary)
-            Text("No images")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            if !isCollapsed {
+                Text("No images")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 40)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
     }
 }
 
