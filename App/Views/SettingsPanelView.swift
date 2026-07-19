@@ -49,6 +49,12 @@ struct SettingsPanelView: View {
         .onChange(of: compressionMode) { _, mode in
             viewModel.settings.lossless = (mode == .lossless)
         }
+        .onChange(of: viewModel.settings.outputFormat) { _, format in
+            // Lossless isn't available for AVIF — fall back to lossy on switch
+            if format == .avif, compressionMode == .lossless {
+                compressionMode = .lossy
+            }
+        }
     }
 
     // MARK: - Upload section (Figma 217:6387) — fixed 174px height
@@ -76,12 +82,18 @@ struct SettingsPanelView: View {
         .background(sectionFill, in: RoundedRectangle(cornerRadius: 12))
     }
 
+    // Apple's ImageIO encoder has no lossless AVIF support, so the Lossless
+    // option is only offered for WebP output.
+    private var availableCompressionModes: [CompressionMode] {
+        viewModel.settings.outputFormat == .avif ? [.lossy] : CompressionMode.allCases
+    }
+
     private var compressionRow: some View {
         HStack {
             rowLabel("Compression")
             Spacer()
             Picker("", selection: $compressionMode) {
-                ForEach(CompressionMode.allCases) { mode in
+                ForEach(availableCompressionModes) { mode in
                     Text(mode.rawValue).tag(mode)
                 }
             }
