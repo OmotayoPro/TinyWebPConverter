@@ -16,39 +16,31 @@ struct ContentView: View {
 
         PreviewView(viewModel: viewModel)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(16)
+            // Inset the preview so it ends at the inspector's leading edge (288pt panel)
+            .padding(.trailing, 280)
 
             // ── Sidebar ─────────────────────────────────────────────────────
             .overlay(alignment: .leading) {
-                if viewModel.isSidebarCollapsed {
-                    // Minimized: naturally-sized card centred vertically
-                    VStack {
-                        Spacer()
+                // Sidebar stays hidden entirely until files have been uploaded.
+                // A single card whose frame morphs between expanded (236pt, full
+                // height) and minimized (64pt, centred) so the spring animates one
+                // view instead of cross-fading two differently-shaped ones.
+                if !viewModel.queue.isEmpty {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
                         sidebarView
-                            .frame(height: collapsedCardHeight)
+                            .frame(width: viewModel.isSidebarCollapsed ? 64 : 236)
+                            .frame(maxHeight: viewModel.isSidebarCollapsed ? collapsedCardHeight : .infinity)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                            .padding(.horizontal, 8)
-                        Spacer()
+                            .shadow(color: .black.opacity(0.2), radius: 30, x: 0, y: 4)
+                            .shadow(color: .black.opacity(0.15), radius: 15, x: -2, y: 0)
+                        Spacer(minLength: 0)
                     }
-                    .frame(width: 80)
+                    .padding(8)
                     .ignoresSafeArea(edges: .top)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.88, anchor: .leading).combined(with: .opacity),
-                        removal:   .scale(scale: 0.88, anchor: .leading).combined(with: .opacity)
-                    ))
-                } else {
-                    // Expanded: full-height card (extends behind toolbar)
-                    sidebarView
-                        .frame(maxHeight: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                        .padding(8)
-                        .frame(width: 252)   // card = 236 + 8px gap each side
-                        .ignoresSafeArea(edges: .top)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal:   .move(edge: .leading).combined(with: .opacity)
-                        ))
+                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
             }
             .animation(.spring(duration: 0.35, bounce: 0.2), value: viewModel.isSidebarCollapsed)
@@ -65,7 +57,13 @@ struct ContentView: View {
             }
 
             .frame(minWidth: 860, minHeight: 540)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background {
+                ZStack {
+                    Color(nsColor: .windowBackgroundColor)
+                    DotGridBackground()
+                }
+                .ignoresSafeArea()
+            }
             .overlay(alignment: .top) {
                 if !viewModel.rejectedFiles.isEmpty {
                     RejectedFilesView(files: viewModel.rejectedFiles) { file in
@@ -112,6 +110,27 @@ struct ContentView: View {
             onDeleteSelected: { viewModel.removeSelectedItems() },
             onToggleSelectAll: { viewModel.toggleSelectAll() }
         )
+    }
+}
+
+// MARK: - Dotted particle grid background
+
+private struct DotGridBackground: View {
+    var body: some View {
+        Canvas { context, size in
+            let spacing: CGFloat = 10
+            let dotSize: CGFloat = 1.5
+            var y = spacing / 2
+            while y < size.height {
+                var x = spacing / 2
+                while x < size.width {
+                    let rect = CGRect(x: x - dotSize / 2, y: y - dotSize / 2, width: dotSize, height: dotSize)
+                    context.fill(Path(ellipseIn: rect), with: .color(.primary.opacity(0.05)))
+                    x += spacing
+                }
+                y += spacing
+            }
+        }
     }
 }
 

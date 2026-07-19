@@ -11,6 +11,9 @@ private enum CompressionMode: String, CaseIterable, Identifiable {
 
 /// Inspector panel — Figma node 217:6385. Width 272, fills height, floating card with
 /// cornerRadius 16. Sections top-aligned, Convert button pinned to bottom.
+/// Solid section fill — #2B2B2B at 100% opacity.
+let sectionFill = Color(red: 43 / 255, green: 43 / 255, blue: 43 / 255)
+
 struct SettingsPanelView: View {
     @Bindable var viewModel: ConverterViewModel
 
@@ -54,7 +57,7 @@ struct SettingsPanelView: View {
         DropZoneView { urls in viewModel.addFiles(urls) }
             .frame(maxWidth: .infinity)
             .frame(height: 174)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+            .background(sectionFill, in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Properties group (Figma 217:6393)
@@ -70,7 +73,7 @@ struct SettingsPanelView: View {
             metadataRow
         }
         .padding(.horizontal, 10)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+        .background(sectionFill, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var compressionRow: some View {
@@ -188,7 +191,7 @@ struct SettingsPanelView: View {
             outputFolderRow
         }
         .padding(.horizontal, 10)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+        .background(sectionFill, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var outputFormatRow: some View {

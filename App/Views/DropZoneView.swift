@@ -46,6 +46,8 @@ struct DropZoneView: View {
             }
             .padding(.vertical, 24)
         }
+        .contentShape(Rectangle())
+        .onTapGesture { presentFilePicker() }
         .onDrop(of: [.fileURL], isTargeted: $isTargeted, perform: handleDrop)
     }
 
