@@ -32,7 +32,11 @@ final class ConverterViewModel {
     var outputDirectoryOverride: URL?
 
     var selectedItemID: BatchItem.ID? {
-        didSet { schedulePreviewUpdate() }
+        didSet {
+            guard oldValue != selectedItemID else { return }
+            showSelectedOriginalImmediately()
+            schedulePreviewUpdate()
+        }
     }
     private(set) var selectedItemIDs: Set<BatchItem.ID> = []
     private var anchorItemID: BatchItem.ID?
@@ -57,6 +61,7 @@ final class ConverterViewModel {
 
     private let fileManager: FileManager
     private var previewTask: Task<Void, Never>?
+    private var originalLoadTask: Task<Void, Never>?
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -198,6 +203,32 @@ final class ConverterViewModel {
     private func applyStatus(id: UUID, status: BatchItemStatus) {
         guard let index = queue.firstIndex(where: { $0.id == id }) else { return }
         queue[index].status = status
+    }
+
+    /// Swaps the preview to the newly selected image right away, so the encode
+    /// shimmer plays over the new image instead of the previously displayed one.
+    private func showSelectedOriginalImmediately() {
+        originalLoadTask?.cancel()
+        previewEncodedImage = nil
+        previewEncodedByteCount = nil
+        previewErrorMessage = nil
+
+        guard let url = selectedItem?.sourceURL else {
+            previewOriginalImage = nil
+            previewOriginalByteCount = nil
+            return
+        }
+
+        originalLoadTask = Task { [weak self] in
+            let (data, byteCount): (Data?, Int?) = await Task.detached(priority: .userInitiated) {
+                let data = try? Data(contentsOf: url)
+                let bytes = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int
+                return (data, bytes)
+            }.value
+            guard let self, !Task.isCancelled, self.selectedItem?.sourceURL == url else { return }
+            if let data { self.previewOriginalImage = NSImage(data: data) }
+            self.previewOriginalByteCount = byteCount
+        }
     }
 
     /// PRD §6.3: debounced — only re-encodes after the user pauses adjusting settings.

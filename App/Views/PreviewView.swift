@@ -28,7 +28,7 @@ struct PreviewView: View {
                 styledImage(encoded)
             } else if let original = viewModel.previewOriginalImage {
                 styledImage(original)
-                    .opacity(viewModel.isGeneratingPreview ? 0.4 : 0.85)
+                    .opacity(viewModel.isGeneratingPreview ? 0.52 : 0.85)
             }
 
             if !isEncoding, let msg = viewModel.previewErrorMessage {
