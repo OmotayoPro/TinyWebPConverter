@@ -30,7 +30,7 @@ struct ContentView: View {
                             .padding(.horizontal, 8)
                         Spacer()
                     }
-                    .frame(width: 104)
+                    .frame(width: 80)
                     .ignoresSafeArea(edges: .top)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.88, anchor: .leading).combined(with: .opacity),
@@ -43,7 +43,7 @@ struct ContentView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
                         .padding(8)
-                        .frame(width: 232)
+                        .frame(width: 252)   // card = 236 + 8px gap each side
                         .ignoresSafeArea(edges: .top)
                         .transition(.asymmetric(
                             insertion: .move(edge: .leading).combined(with: .opacity),

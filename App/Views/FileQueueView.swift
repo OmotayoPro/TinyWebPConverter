@@ -30,6 +30,9 @@ struct FileQueueView: View {
                     listLayout
                 }
             }
+            // Minimized view scrolls without showing a scrollbar (.never suppresses
+            // the indicator even when the system is set to always show scroll bars)
+            .scrollIndicators(isCollapsed ? .never : .automatic)
         }
         .background(Color.clear)
         .focusable()
@@ -43,19 +46,16 @@ struct FileQueueView: View {
     @ViewBuilder
     private var header: some View {
         if isCollapsed {
-            HStack {
-                Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 10, height: 10)
-                Spacer()
-                Button { onToggleSelectAll() } label: {
-                    Text(allSelected ? "Desel." : "Select")
+            Button { onToggleSelectAll() } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: allSelected ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 11))
+                    Text("Select")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(allSelected ? Color.accentColor : Color.secondary)
                 }
-                .buttonStyle(.plain)
+                .foregroundStyle(allSelected ? Color.accentColor : Color.secondary)
             }
-            .padding(.horizontal, 10)
+            .buttonStyle(.plain)
             .padding(.top, 8)
             .padding(.bottom, 6)
         } else {
@@ -77,7 +77,7 @@ struct FileQueueView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
             .padding(.top, 48)
             .padding(.bottom, 8)
         }
@@ -170,9 +170,10 @@ private struct ThumbnailCell: View {
     let showLabel: Bool
 
     @State private var thumbnail: NSImage?
+    @State private var fileSizeText: String?
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 4) {
             ZStack {
                 RoundedRectangle(cornerRadius: 7)
                     .fill(Color(nsColor: .quaternaryLabelColor))
@@ -202,15 +203,29 @@ private struct ThumbnailCell: View {
             .shadow(color: .black.opacity(isSelected ? 0.15 : 0.06), radius: 2, y: 1)
 
             if showLabel {
-                Text(item.sourceURL.deletingPathExtension().lastPathComponent)
-                    .font(.system(size: 10))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(item.sourceURL.lastPathComponent)
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                        .frame(height: 16, alignment: .leading)
+
+                    Text(fileSizeText ?? " ")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(height: 14, alignment: .leading)
+                }
+                .frame(width: thumbSize, alignment: .leading)
             }
         }
         .task(id: item.sourceURL) {
             thumbnail = await loadThumbnail(url: item.sourceURL, size: thumbSize)
+            if let bytes = (try? FileManager.default.attributesOfItem(atPath: item.sourceURL.path))?[.size] as? Int64 {
+                // "1.5 MB" → "1.5MB" (formatter may use regular or non-breaking spaces)
+                fileSizeText = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+                    .filter { !$0.isWhitespace }
+            }
         }
     }
 
