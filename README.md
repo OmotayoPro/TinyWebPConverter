@@ -5,7 +5,7 @@ WebP. No accounts, no network calls, no subscriptions. See [`tiny-webp-converter
 for the full product spec.
 
 ## Status
-
+Update: App is now live for download and testing
 Early: the core conversion pipeline (`TinyWebPCore`) is implemented and tested as a standalone
 Swift package, independent of any UI. The SwiftUI app target hasn't been added yet.
 
